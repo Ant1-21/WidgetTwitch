@@ -24,6 +24,14 @@ font-size: 14px;
     margin: 15px;
 }
 
+.error {
+    height: 1rem;
+    width: 200px;
+    margin: 15px;
+    font-size: 16px;
+    font-weight: bold;
+}
+
 .frame{
     display: flex; 
     width: 100%; 

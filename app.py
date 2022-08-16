@@ -41,51 +41,71 @@ class Channel:
             f"Image: {self.image}\n\tGame: {self.game}\n"
         )
 
-    def get_channel_info(self) -> None:
+    def get_channel_info(self) -> int:
         """
         It gets the channel's information from the Twitch API and
         stores it in the class
         """
-        jsn: dict = json.loads(
-            rq.get(
+        try:
+            response = rq.get(
                 f"https://api.twitch.tv/helix/users?login={self.__init_name}",
-                headers={"Authorization": f"Bearer {TOKEN}", "Client-Id": ID},
-            ).text
-        )
-        data: dict = jsn["data"][0]
-        self.channel_id = data["id"]
-        self.login = data["login"]
-        self.name = data["display_name"]
-        self.image = data["profile_image_url"]
-        self.offline_image = data["profile_image_url"]
-        # self.offlineImage = data["offline_image_url"]
+                headers={"Authorization": f"Bearer {TOKEN}", "Client-Id": ID}
+            )
+        except rq.exceptions.RequestException:
+            return 1
 
-    def islive(self) -> None:
+        if response.status_code != 200:
+            return 1
+
+        jsn: dict = json.loads(response.text)
+        if len(jsn["data"]) > 0:
+            data: dict = jsn["data"][0]
+            self.channel_id = data["id"]
+            self.login = data["login"]
+            self.name = data["display_name"]
+            self.image = data["profile_image_url"]
+            self.offline_image = data["profile_image_url"]
+        else:
+            return 1
+
+        return 0
+
+    def islive(self) -> int:
         """
         It checks if the user is live, and if they are, it sets the
         `live` attribute to `True`, and sets the `game` and `viewer`
         attributes to the game they're playing and the number of viewers
         they have, respectively
         """
-        if self.channel_id is not None:
-            jsn: dict = json.loads(
-                rq.get(
-                    "https://api.twitch.tv/helix/streams?"
-                    f"user_id={self.channel_id}",
-                    headers={
-                        "Authorization": f"Bearer {TOKEN}",
-                        "Client-Id": ID
-                    },
-                ).text
+        if self.channel_id is None:
+            return 1
+        try:
+            response = rq.get(
+                "https://api.twitch.tv/helix/streams?"
+                f"user_id={self.channel_id}",
+                headers={
+                    "Authorization": f"Bearer {TOKEN}",
+                    "Client-Id": ID
+                }
             )
-            if len(jsn["data"]) > 0:
-                self.live = True
-                self.game = jsn["data"][0]["game_name"]
-                self.viewer = re.sub(
-                    r"([0-9,]*)([KM])",
-                    r"\1&nbsp;\2",
-                    numerize.numerize(jsn["data"][0]["viewer_count"]),
-                )
+        except rq.exceptions.RequestException:
+            print("Exception !")
+            return 1
+
+        if response.status_code != 200:
+            print(f"Status code : {response.status_code}")
+            return 1
+
+        jsn: dict = json.loads(response.text)
+        if len(jsn["data"]) > 0:
+            self.live = True
+            self.game = jsn["data"][0]["game_name"]
+            self.viewer = re.sub(
+                r"([0-9,]*)([KM])", r"\1&nbsp;\2",
+                numerize.numerize(jsn["data"][0]["viewer_count"])
+            )
+            # self.viewer = numerize.numerize(jsn["data"][0]["viewer_count"])
+        return 0
 
     def tohtml(self) -> str:
         """
@@ -102,7 +122,10 @@ class Channel:
 <div class="main">
     <a href="https://www.twitch.tv/{self.login}">
         <div class="frame">
-            <img src="{self.image if self.live else self.offline_image}"/>
+            <img
+                style="filter: grayscale({0 if self.live else 1});"
+                src="{self.image}"
+            />
             <div class="text">
                 <p style="font-weight: bold;">{self.name}</p>
                 {witchgame}
@@ -120,13 +143,20 @@ def main():
     gets the channel info, checks if the channel is live, and then writes
     the HTML for each channel to stdout
     """
+    try:
+        rq.get('https://google.com')
+    except rq.exceptions.RequestException:
+        sys.stdout.write("<div class='error'>&#9888;&nbsp;Not connected</div>")
+        return
+
     channels = []
     with open("Twitch.widget/channels.txt", encoding="utf-8") as file:
         channels.extend(Channel(line.strip()) for line in file)
     for channel in channels:
-        channel.get_channel_info()
-        channel.islive()
-        sys.stdout.write(channel.tohtml())
+        if (channel.get_channel_info() or channel.islive()):
+            sys.stdout.write("<div class='error'>An error has occurred.</div>")
+        else:
+            sys.stdout.write(channel.tohtml())
 
 
 if __name__ == "__main__":
