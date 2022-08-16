@@ -122,7 +122,7 @@ class Channel:
             ).lower()
             witchgame: str = f"<p>{self.game}</p>"
             islive: str = (
-                "<p class='live'>&#x2022;&nbsp;</p>"
+                "<p class='live'>&#128308;&nbsp;</p>"
                 f"<p>{nbviewers}</p>"
             )
         else:

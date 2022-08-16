@@ -83,8 +83,8 @@ a {
 }
 
 .frame div.spec p.live {
-    color: red;
-    font-size: 20px;
+    font-size: 7px;
+    margin-right: 5px;
 }
 
 """
