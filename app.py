@@ -1,9 +1,9 @@
 """ It imports the modules:
-json to transform requests json to python dict,
-re to transfor strings using regular expression,
-sys to send html output to the widget,
-numerize to convert large numbers into readable strings,
-and requests to get Twitch channels informations through API.
+**json** to transform requests json to python dict,
+**re** to transfor strings using regular expression,
+**sys** to send html output to the widget,
+**numerize** to convert large numbers into readable strings,
+and **requests** to get Twitch channels informations through API.
 """
 import json
 import re
@@ -20,16 +20,13 @@ class Channel:
     """This class is used to store information about a Twitch channel"""
 
     def __init__(self, login: str):
-        self.__init_name = login
         self.channel_id: int = 0
-        self.login: str = ""
+        self.login: str = login
         self.name: str = ""
         self.live: bool = False
         self.image: str = ""
-        self.offline_image: str = ""
         self.game: str = ""
         self.viewer: int = 0
-        self.error: bool = False
 
     def __str__(self):
         """
@@ -43,70 +40,6 @@ class Channel:
             f"Channel :\n\tName: {self.name}\n\t"
             f"Live: {self.live}\n\tViewers: {self.viewer}"
         )
-
-    def get_channel_info(self) -> int:
-        """
-        It gets the channel's information from the
-        Twitch API and stores it in the class
-
-        :return: The return value is an integer for errors.
-        """
-        try:
-            response = rq.get(
-                f"https://api.twitch.tv/helix/users?login={self.__init_name}",
-                headers={"Authorization": f"Bearer {TOKEN}", "Client-Id": ID}
-            )
-        except rq.exceptions.RequestException:
-            return 1
-
-        if response.status_code != 200:
-            return 1
-
-        jsn: dict = json.loads(response.text)
-        if len(jsn["data"]) > 0:
-            data: dict = jsn["data"][0]
-            self.channel_id = data["id"]
-            self.login = data["login"]
-            self.name = data["display_name"]
-            self.image = data["profile_image_url"]
-            self.offline_image = data["profile_image_url"]
-        else:
-            return 1
-
-        return 0
-
-    def islive(self) -> int:
-        """
-        It checks if the channel is live and if it is,
-        it updates the game and viewer count
-
-        :return: The return value is the status code of the request.
-        """
-        if self.channel_id is None:
-            return 1
-        try:
-            response = rq.get(
-                "https://api.twitch.tv/helix/streams?"
-                f"user_id={self.channel_id}",
-                headers={
-                    "Authorization": f"Bearer {TOKEN}",
-                    "Client-Id": ID
-                }
-            )
-        except rq.exceptions.RequestException:
-            print("Exception !")
-            return 1
-
-        if response.status_code != 200:
-            print(f"Status code : {response.status_code}")
-            return 1
-
-        jsn: dict = json.loads(response.text)
-        if len(jsn["data"]) > 0:
-            self.live = True
-            self.game = jsn["data"][0]["game_name"]
-            self.viewer = int(jsn["data"][0]["viewer_count"])
-        return 0
 
     def tohtml(self) -> str:
         """
@@ -147,6 +80,83 @@ class Channel:
 """
 
 
+def get_channels_info(channels_name, channels_list) -> int:
+    """
+    It takes a list of channel names and a list of channels,
+    and it fills the list of channels with the information of
+    the channels in the list of channel names
+
+    :param channels_name: a list of the channels you want to get info for
+    :param channels_list: list of Channel objects
+    :return: An integer status code
+    """
+    try:
+        url = "https://api.twitch.tv/helix/users?"
+        for i, user in enumerate(channels_name):
+            if i > 0:
+                url += "&"
+            url += f"login={user}"
+        response = rq.get(
+            url, headers={"Authorization": f"Bearer {TOKEN}", "Client-Id": ID}
+        )
+    except rq.exceptions.RequestException:
+        return 1
+
+    if response.status_code != 200:
+        return 1
+
+    jsn: dict = json.loads(response.text)
+    if len(jsn["data"]) == 0:
+        return 1
+
+    for name in channels_name:
+        for data in jsn["data"]:
+            if name.lower() == data["login"].lower():
+                channel = Channel(data["login"])
+                channel.channel_id = data["id"]
+                channel.login = data["login"]
+                channel.name = data["display_name"]
+                channel.image = data["profile_image_url"]
+                channels_list.append(channel)
+    return 0
+
+
+def channels_live(channels_list) -> int:
+    """
+    It takes a list of channels and checks if they are live
+
+    :param channels_list: list of Channel objects
+    :return: An integer status code
+    """
+    for channel in channels_list:
+        if channel.channel_id is None:
+            return 1
+    try:
+        url = "https://api.twitch.tv/helix/streams?"
+        for i, channel in enumerate(channels_list):
+            if i > 0:
+                url += "&"
+            url += f"user_id={channel.channel_id}"
+        response = rq.get(
+            url, headers={"Authorization": f"Bearer {TOKEN}", "Client-Id": ID}
+        )
+    except rq.exceptions.RequestException:
+        return 1
+
+    if response.status_code != 200:
+        return 1
+
+    jsn: dict = json.loads(response.text)
+    if len(jsn["data"]) > 0:
+        for data in jsn["data"]:
+            for channel in channels_list:
+                if channel.channel_id == data["user_id"]:
+                    channel.live = True
+                    channel.game = data["game_name"]
+                    channel.viewer = int(data["viewer_count"])
+    return 0
+
+
 def main():
     """
     It reads the channels.txt file, gets the channel info
@@ -156,26 +166,28 @@ def main():
     :return: the html code for the widget.
     """
     try:
-        rq.get('https://google.com')
+        rq.get('https://1.1.1.1')
     except rq.exceptions.RequestException:
         sys.stdout.write("<div class='error'>"
                          "&#9888;&nbsp;Not connected.</div>")
         return
 
-    channels = []
+    channels_list: list = []
+    channels_name: list = []
+
     with open("Twitch.widget/channels.txt", encoding="utf-8") as file:
-        channels.extend(Channel(line.strip()) for line in file)
+        channels_name.extend(line.strip() for line in file)
 
-    for channel in channels:
-        channel.error = channel.get_channel_info() or channel.islive()
+    if get_channels_info(channels_name, channels_list):
+        sys.stdout.write("<div class='error'>An error has occurred.</div>")
 
-    channels.sort(key=lambda x: x.viewer, reverse=True)
+    if channels_live(channels_list):
+        sys.stdout.write("<div class='error'>An error has occurred.</div>")
 
-    for channel in channels:
-        if channel.error:
-            sys.stdout.write("<div class='error'>An error has occurred.</div>")
-        else:
-            sys.stdout.write(channel.tohtml())
+    channels_list.sort(key=lambda x: x.viewer, reverse=True)
+
+    for channel in channels_list:
+        sys.stdout.write(channel.tohtml())
 
 
 if __name__ == "__main__":
