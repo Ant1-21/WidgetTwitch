@@ -6,14 +6,15 @@
 
 ## Get Twitch credentials
 
-- Create a Twitch app in [Twitch console](https://dev.twitch.tv/console) following this [tutorial](https://dev.twitch.tv/docs/api/get-started).
+- Create a Twitch app in [Twitch console](https://dev.twitch.tv/console) following this [tutorial](https://dev.twitch.tv/docs/api/get-started)
 - Get your Client identifier.
 - Generate a new Client secret.
-- Generate a token using above command.
-- Set your Client ID and Token in ```app.py``` file.
+- Create a `.env` file in app directory.
+- Set your Client ID and Secret in `.env` file like in the example below.
 
 ```bash
-bash getToken.sh --id "<Your Client Id>" --secret "<Your Client Secret>"
+ID=<your-client-id>
+SECRET=<your-client-secret>
 ```
 
 ## Install python modules requirements
